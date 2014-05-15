@@ -71,7 +71,16 @@ set wrap on
 set verify off
 set pagesize 0 echo off timing off linesize 1000 trimspool on trim on long 2000000 longchunksize 2000000 feedback off
 spool ^4/^2..html
-select dbms_sqltune.report_sql_monitor(type=>'EM', sql_id=>'^PREV_SQLID') monitor_report from dual;
+select dbms_sqltune.report_sql_monitor(type=>'ACTIVE', report_level=>'ALL',sql_id=>'^PREV_SQLID') monitor_report from dual;
+spool off
+
+
+set serveroutput ON SIZE 1000000 FORMAT WORD_WRAPPED
+set wrap on
+set verify off
+set pagesize 0 echo off timing off linesize 1000 trimspool on trim on long 2000000 longchunksize 2000000 feedback off
+spool ^4/^2..xml
+select dbms_sqltune.report_sql_monitor(type=>'XML', report_level=>'METRICS',sql_id=>'^PREV_SQLID') monitor_report from dual;
 spool off
 
 exit

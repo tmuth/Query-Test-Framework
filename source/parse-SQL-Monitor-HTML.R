@@ -4,7 +4,9 @@ library(ggplot2)
 library(scales)
 library(reshape)
 
-filePattern <- "^sqlmon_b.+(\\.html|\\.htm)$"
+#filePattern <- "^.+\\.html"
+filePattern <- "^.+\\.xml"
+#filePattern <- "^sqlmon_b.+(\\.html|\\.htm)$"
 #filePattern <- "^sqlmon_q.+(\\.html|\\.htm)$"
 #filePattern <- "^sqlmon_.+(\\.html|\\.htm)$"
 
@@ -12,7 +14,7 @@ filePattern <- "^sqlmon_b.+(\\.html|\\.htm)$"
 #setwd("M:/Dropbox/MyFiles/Code Samples/SQL-Test-Harness/retail-d56-queries")
 
 #namePattern <- "sqlmon_rtl([a-zA-Z0-9_-]+)\\..*"
-namePattern <- "sqlmon_b_([a-zA-Z0-9_-]+)\\..*"
+#namePattern <- "sqlmon_b_([a-zA-Z0-9_-]+)\\..*"
 #namePattern <- "sqlmon_q([a-zA-Z0-9_-]+)\\..*"
 #namePattern <- "sqlmon_caltrans_sql(0-9_-]+)\\..*"
 
@@ -40,6 +42,8 @@ parse_SQL_Monitor <- function(fileName){
     
   
   doc <- xmlParse(fileName, getDTD = F)
+  #myDoc <<- doc
+  #x <-- base64Decode(type.convert(xmlValue(doc[['//report']])))
   
   reportDF <- data.frame('sql_id'=xmlValue(doc[["//report_parameters/sql_id"]]))
   addXmlValue <- function(colname,xpath){
@@ -47,6 +51,8 @@ parse_SQL_Monitor <- function(fileName){
   }
   
 
+  
+  
   
   
   addOutputColumn('name',gsub(pattern = namePattern, replacement="\\1", f))
@@ -70,7 +76,7 @@ parse_SQL_Monitor <- function(fileName){
   
   
   addOutputColumn('parallel_query_mode',get_stat(optimizerEnvDF,'parallel_query_mode'))
-  addOutputColumn('parallel_degree',get_stat(optimizerEnvDF,'parallel_degree'))
+  #addOutputColumn('parallel_degree',get_stat(optimizerEnvDF,'parallel_degree'))
   addOutputColumn('parallel_query_forced_dop',get_stat(optimizerEnvDF,'parallel_query_forced_dop'))
   addOutputColumn('cell_offload_processing',get_stat(optimizerEnvDF,'cell_offload_processing'))
   
@@ -127,13 +133,14 @@ sqlMonFiles <- list.files(pattern=filePattern)
 
 for (f in sqlMonFiles) {
   print(f)
-  tryCatch(parse_SQL_Monitor(f), 
-           error = function(e) {
-             #traceback()
-             print(paste0("Error in ",f,": ",e))
- 
-           }
-  )
+  parse_SQL_Monitor(f)
+#   tryCatch(parse_SQL_Monitor(f), 
+#            error = function(e) {
+#              #traceback()
+#              print(paste0("Error in ",f,": ",e))
+#  
+#            }
+#   )
 }
 
 
@@ -141,7 +148,7 @@ for (f in sqlMonFiles) {
 write.csv(sqlMonResults_DF,"sql-mon-results-DF.csv")
 
 
-sqlMonResults_DF <- subset(sqlMonResults_DF,parallel_degree <= 100)
+#sqlMonResults_DF <- subset(sqlMonResults_DF,parallel_degree <= 100)
 ###########################################################################
 # The rest is graphing of the data frame we created
 ###########################################################################
