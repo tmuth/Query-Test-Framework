@@ -1,0 +1,6 @@
+SELECT  /*+ monitor */ sum(B.AMOUNT_SOLD) amt_sold,
+  A.PROD_CATEGORY
+FROM SALES B,
+  PRODUCTS A
+WHERE A.PROD_ID = B.PROD_ID 
+group by A.PROD_CATEGORY;
