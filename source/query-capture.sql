@@ -66,6 +66,17 @@ select * from table(dbms_xplan.display_cursor(sql_id => '^PREV_SQLID', format=>'
 
 spool off
 
+set serveroutput on
+begin
+	$IF dbms_db_version.ver_le_11_2 $THEN
+		dbms_output.put_line('Version 11.2 or less, not setting event to disable XML compression');
+	$ELSE
+		dbms_output.put_line('Version is 12.1 or greater, setting event to disable XML compression');
+		execute immediate q'[ alter session set events='emx_control compress_xml=none' ]' ;
+	$END
+end;
+/
+
 set serveroutput ON SIZE 1000000 FORMAT WORD_WRAPPED
 set wrap on
 set verify off
@@ -75,12 +86,12 @@ select dbms_sqltune.report_sql_monitor(type=>'ACTIVE', report_level=>'ALL',sql_i
 spool off
 
 
-set serveroutput ON SIZE 1000000 FORMAT WORD_WRAPPED
-set wrap on
-set verify off
-set pagesize 0 echo off timing off linesize 1000 trimspool on trim on long 2000000 longchunksize 2000000 feedback off
-spool ^4/^2..xml
-select dbms_sqltune.report_sql_monitor(type=>'XML', report_level=>'METRICS',sql_id=>'^PREV_SQLID') monitor_report from dual;
-spool off
+-- set serveroutput ON SIZE 1000000 FORMAT WORD_WRAPPED
+-- set wrap on
+-- set verify off
+-- set pagesize 0 echo off timing off linesize 1000 trimspool on trim on long 2000000 longchunksize 2000000 feedback off
+-- spool ^4/^2..xml
+-- select dbms_sqltune.report_sql_monitor(type=>'XML', report_level=>'BASIC+METRICS',sql_id=>'^PREV_SQLID') monitor_report from dual;
+-- spool off
 
 exit
