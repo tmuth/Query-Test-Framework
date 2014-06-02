@@ -40,14 +40,17 @@ alter session set statistics_level=ALL;
 prompt about to run ^2
 
 spool ^4/^2..txt
-set timing on
 
+set echo off
+set timing on
+set wrap off
 @^1
 
 set timing off
 
+
 column prev_sql_id new_value PREV_SQLID
-select prev_sql_id from gv$session where audsid=userenv('sessionid');
+select prev_sql_id from v$session where audsid=userenv('sessionid');
 
 select s.name, m.value
   from v$mystat m, v$statname s

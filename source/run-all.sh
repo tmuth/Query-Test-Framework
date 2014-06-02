@@ -1,24 +1,27 @@
 #!/bin/bash
-DIRECTORY=test-queries
+DIRECTORY=queries
 #OUTPUT_SUB_DIRECTORY="Test1"
 OUTPUT_SUB_DIRECTORY=`echo "test_"$(date +"%m-%d_%H-%M-%S")`
 FILES=*.sql
 ALTER_SESSION_FILE=null.sql
-CONNECT_STRING=sh/sh@//localhost/pdborcl.home
-
+CONNECT_STRING=scott/tiger
+. ~/./orcl.env
 
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-#echo $SCRIPT_DIR
+echo $SCRIPT_DIR
 
 if [[ "$OSTYPE" == "cygwin" ]]; then
         QUERY_CAPTURE_FILE=`cygpath -w ${SCRIPT_DIR}/query-capture.sql`
+		echo "cygwin"
 else
-       QUERY_CAPTURE_FILE=`${SCRIPT_DIR}/query-capture.sql`
+       QUERY_CAPTURE_FILE="${SCRIPT_DIR}/query-capture.sql"
+	   echo "not cygwin"
 fi
-#echo $QUERY_CAPTURE_FILE
+echo "$QUERY_CAPTURE_FILE"
 
 cd $DIRECTORY
+
 
 
 if [[ ! -f ${f} ]];
@@ -42,7 +45,10 @@ do
 			echo "Processing $f file..."
 			queryname=`basename $f .sql | sed 's/\..\{3\}$//' | sed 's/[\/|\.]//g'`
 			echo "Query Name: $queryname"
+			
 			\sqlplus $CONNECT_STRING @"$QUERY_CAPTURE_FILE" $f $queryname "$ALTER_SESSION_FILE" $OUTPUT_SUB_DIRECTORY
 		fi
 	fi
 done
+
+grep -m 1 Elapsed *.txt > timing.out
