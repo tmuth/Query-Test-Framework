@@ -3,11 +3,6 @@ library(XML)
 library(ggplot2)
 library(scales)
 library(reshape)
-library(gridExtra)
-library(tools)
-library(stringr)
-library(sjPlot)
-library(lubridate)
 
 #filePattern <- "^.+\\.html"
 filePattern <- "^.+\\.html$"
@@ -22,10 +17,10 @@ filePattern <- "^.+\\.html$"
 #namePattern <- "sqlmon_b_([a-zA-Z0-9_-]+)\\..*"
 #namePattern <- "sqlmon_q([a-zA-Z0-9_-]+)\\..*"
 #namePattern <- "sqlmon_caltrans_sql(0-9_-]+)\\..*"
-namePattern <- "rtl([0-9a]+)\\..*"
+namePattern <- "sqlmon_b_px([0-9]+)\\..*"
 
 sqlMonResults_DF <- data.frame()
-#the_doc <- NULL
+
 parse_SQL_Monitor <- function(fileName){
 
   output_DF <- data.frame('file'=f)
@@ -47,7 +42,6 @@ parse_SQL_Monitor <- function(fileName){
     
   
   doc <- xmlParse(fileName, getDTD = F)
-  #the_doc <<- doc
   #myDoc <<- doc
   #x <-- base64Decode(type.convert(xmlValue(doc[['//report']])))
   
@@ -69,47 +63,16 @@ parse_SQL_Monitor <- function(fileName){
   
 
   
-  ##################################################
-  # extract from text file
-  
-  theFile <- readLines(paste0(file_path_sans_ext(fileName),'.txt'))
-  theFileTXT <- paste(theFile, collapse='\n')
-  strTmp <- str_extract(theFileTXT, perl('\nElapsed:.+\n'))
-  strTmp2 <- str_extract(strTmp,perl('[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{2}'))
-  
-  options(digits.secs = 2)
-  sqlplusElapsedTime <- period_to_seconds(hms(strTmp2))
-  
-  
-    ##############
-    # the following is to get the data out of the v$mystat section. its just a sample at this point
-    # should add the header / footer info from awr-miner, then use that routine to exract this data. 
-  
-    #foo <- str_extract(theFileTXT,'\nNAME.+VALUE.+')
-    #foo2 <- str_extract(foo,'.+?[0-9]+ rows selected\\.')
-  
-    ##############
-  
-  
-  rm(theFileTXT)
-  rm(strTmp)
-  rm(strTmp2)
-  
-  #
-  ##################################################
   
   
   
   addOutputColumn('name',gsub(pattern = namePattern, replacement="\\1", f))
-  addXmlValue('user','//target/user')
+  
   addXmlValue('duration','//target/duration')
   
   
-  
-  
-  
   output_DF <- cbind(output_DF,reportDF)
-  addOutputColumn('sqlplus.elap',sqlplusElapsedTime)
+  
   
   
   optimizerVars <- getNodeSet(doc,"//optimizer_env/param")
@@ -120,25 +83,13 @@ parse_SQL_Monitor <- function(fileName){
   rm(optDFKeys)
   rm(optDFVals)
   
-  #addOutputColumn('parallel_query_mode',get_stat(optimizerEnvDF,'parallel_query_mode'))
-  addOutputColumn('parallel_degree',get_stat(optimizerEnvDF,'parallel_degree'))
-  #addOutputColumn('parallel_query_forced_dop',get_stat(optimizerEnvDF,'parallel_query_forced_dop'))
-  #addOutputColumn('cell_offload_processing',get_stat(optimizerEnvDF,'cell_offload_processing'))
   
   
-  otherXML <- getNodeSet(doc,"//other_xml/info")
-  otherXMLKeys <- data.frame(key=sapply(otherXML, xmlGetAttr, "type"))
-  otherXMLVals <- data.frame(val=sapply(otherXML, xmlValue))
-  otherXMLDF <- cbind(otherXMLKeys,otherXMLVals)
-  rm(otherXMLKeys)
-  rm(otherXMLVals)
   
-  
-  addOutputColumn('px_inmem',get_stat(otherXMLDF,'px_in_memory'))
-  addOutputColumn('in_mem_option',get_stat(otherXMLDF,'px_in_memory_imc'))
-  addOutputColumn('cardinality_feedback',get_stat(otherXMLDF,'cardinality_feedback'))
-  addOutputColumn('dyn_samp',get_stat(otherXMLDF,'dynamic_sampling'))
-
+  addOutputColumn('parallel_query_mode',get_stat(optimizerEnvDF,'parallel_query_mode'))
+  #addOutputColumn('parallel_degree',get_stat(optimizerEnvDF,'parallel_degree'))
+  addOutputColumn('parallel_query_forced_dop',get_stat(optimizerEnvDF,'parallel_query_forced_dop'))
+  addOutputColumn('cell_offload_processing',get_stat(optimizerEnvDF,'cell_offload_processing'))
   
   
   rptStats <- getNodeSet(doc,"//sql_monitor_report/stats/stat")
@@ -180,12 +131,6 @@ parse_SQL_Monitor <- function(fileName){
   addOutputColumn('dbTimePctQueuing', round(get_stat(reportStatsDF,'queuing_time')/elapsedMS,2))
   addOutputColumn('dbTimePctQueuing', round(get_stat(reportStatsDF,'queuing_time')/elapsedMS,2))
   
-  
-  
-  
-  
-  
-  
   sqlMonResults_DF <<- rbind(sqlMonResults_DF,output_DF)
 }
 
@@ -210,10 +155,6 @@ for (f in sqlMonFiles) {
 }
 
 
-sqlMonResults_DF$test <- basename(getwd())
-
-save(sqlMonResults_DF,file=paste(basename(getwd()),".Rda"))
-
 #sqlMonResults_DF <- sqlMonResults_DF[with(sqlMonResults_DF, order(servers_allocated)), ]
 write.csv(sqlMonResults_DF,"sql-mon-results-DF.csv")
 
@@ -224,124 +165,53 @@ write.csv(sqlMonResults_DF,"sql-mon-results-DF.csv")
 ###########################################################################
 
 
-data_frame_col_not_null <- function(df_in, column_in, min_rows_in = 1){
-  #return(TRUE)
-  #foo <<- df_in
-  
-  if((column_in %in% names(df_in))){
-    # the relevant column is in the data frame
-    #print(nrow(df_in[!(is.na(df_in[[column_in]]))]))
-    if(nrow(df_in[!(is.na(df_in[[column_in]])),]) >= min_rows_in){
-      # there are at least min_rows_in number of rows in this df that are not NA
-      return(TRUE)
-    }
-    else{
-      # the column exists, but there are not min_rows_in rows that are not NA (common case would be a column with all NAs)
-      return(FALSE)
-    }
-  }
-  else{
-    # the relevant column is NOT in the data frame
-    return(FALSE)
-  }
-  # fall through, defaults to false
-  return(FALSE)
-}
-
-
-plotIt <- function(plot_in){
-  try(
-    print(plot_in),
-    silent=TRUE
-  )
-}
-
-testName <- sqlMonResults_DF$test[1]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#########
-
-
-#pdf("SQL-Monitor-Graphs2.pdf", width = 11, height = 8.5, useDingbats=FALSE)
-pdf(paste0("SQL-MON-",testName,".pdf"), width = 11, height = 8.5, useDingbats=FALSE)
-
-
-txt <- tableGrob(sqlMonResults_DF[,1:12],show.rownames = FALSE, gpar.coretext = gpar(fontsize=8),gpar.coltext = gpar(fontsize=7),padding.v = unit(1, "mm"),padding.h = unit(2, "mm"),show.colnames = TRUE,col.just = "left")
-grid.arrange(txt,ncol = 1, widths=c(1))
+pdf("SQL-Monitor-Graphs2.pdf", width = 11, height = 8.5,useDingbats=FALSE)
 
 custScalesX<-scale_x_discrete(breaks=trans_breaks("identity", function(x) x, n=30))
 custScalesY<-scale_y_discrete(breaks=trans_breaks("identity", function(x) x, n=30))
   
-# if(data_frame_col_not_null(sqlMonResults_DF,'parallel_degree')){
-#   p <- ggplot(data=sqlMonResults_DF,aes(x=parallel_degree, y=duration))+
-#     geom_point()+
-#     geom_text(aes(label=duration,vjust=1.2),size=3)+
-#     ylab("seconds")+xlab("parallel degree")+
-#     labs(title="Parallel Degree vs Time")
-#   
-#   plotIt(p)
-# }
-# 
-# 
-# if(data_frame_col_not_null(sqlMonResults_DF,'parallel_degree')){
-#   p <- ggplot(data=sqlMonResults_DF,aes(x=parallel_degree,y=readGBperSec))+
-#     geom_point(shape=1)+
-#     geom_text(aes(label=readGBperSec,vjust=1.2),size=3)+
-#     xlab("parallel degree")+
-#     labs(title="Parallel Degree vs Read GB/s")+
-#     custScalesX+custScalesY
-#   
-#   plotIt(p)
-# }
-# 
-# p <- ggplot(data=sqlMonResults_DF,aes(x=name,y=readGBperSec))+
-#   geom_point(shape=1)+
-#   geom_text(aes(label=readGBperSec,vjust=1.2),size=3)+
-#   xlab("query")+
-#   labs(title=paste0("Queries by Average Read GB/s for ",testName))
-#   labs(title="Queries by Average Read GB/s")
-#   
-# plotIt(p)
-# 
-# if(data_frame_col_not_null(sqlMonResults_DF,'parallel_degree')){
-# p <- ggplot(data=sqlMonResults_DF,aes(x=parallel_degree,y=readMBperSecCore))+
-#     geom_point(shape=1)+
-#     xlab("parallel degree")+
-#     labs(title="Parallel Degree vs Read MB/s/core")+
-#     custScalesX+custScalesY
-#   
-#   #sqlMonResults_DF$duration2 <- as.character(sqlMonResults_DF$duration)
-#   #sqlMonResults_DF$duration2 <- factor(sqlMonResults_DF$duration2 , levels=unique(sqlMonResults_DF$duration2 ), ordered=TRUE)
-#   
-#   plotIt(p)
-# }
 
-p <- ggplot(data=sqlMonResults_DF,aes(y=reorder(name,duration),x=duration))+
+ggplot(data=sqlMonResults_DF,aes(x=parallel_degree,y=duration))+
   geom_point()+
   geom_text(aes(label=duration,vjust=1.2),size=3)+
+  ylab("seconds")+xlab("parallel degree")+
+  #custScalesX+custScalesY+
+  labs(title="Parallel Degree vs Time")
+
+
+ggplot(data=sqlMonResults_DF,aes(x=parallel_degree,y=readGBperSec))+
+  geom_point(shape=1)+
+  geom_text(aes(label=readGBperSec,vjust=1.2),size=3)+
+  xlab("parallel degree")+
+  labs(title="Parallel Degree vs Read GB/s")+
+  custScalesX+custScalesY
+
+
+ggplot(data=sqlMonResults_DF,aes(x=name,y=readGBperSec))+
+  geom_point(shape=1)+
+  geom_text(aes(label=readGBperSec,vjust=1.2),size=3)+
+  xlab("query")+
+  labs(title="Queries by Average Read GB/s")
+  
+
+ggplot(data=sqlMonResults_DF,aes(x=parallel_degree,y=readMBperSecCore))+
+  geom_point(shape=1)+
+  xlab("parallel degree")+
+  labs(title="Parallel Degree vs Read MB/s/core")+
+  custScalesX+custScalesY
+
+#sqlMonResults_DF$duration2 <- as.character(sqlMonResults_DF$duration)
+#sqlMonResults_DF$duration2 <- factor(sqlMonResults_DF$duration2 , levels=unique(sqlMonResults_DF$duration2 ), ordered=TRUE)
+
+ggplot(data=sqlMonResults_DF,aes(y=reorder(name,duration),x=duration))+
+  geom_point()+
   xlab("duration")+
   ylab("name")+
   #custScalesX+
   labs(title="Queries by Time (seconds)")
 
 
-plotIt(p)
-
-
-p <- ggplot(data=sqlMonResults_DF,aes(x=reorder(name,offloadEfficiency),y=offloadEfficiency))+
+ggplot(data=sqlMonResults_DF,aes(x=reorder(name,offloadEfficiency),y=offloadEfficiency))+
   geom_point()+
   geom_text(aes(label=(paste0((offloadEfficiency*100),"%")),vjust=1.2),size=3)+
   xlab("Query")+
@@ -349,18 +219,20 @@ p <- ggplot(data=sqlMonResults_DF,aes(x=reorder(name,offloadEfficiency),y=offloa
   labs(title="Queries by Offload Efficiency")+
   scale_y_continuous(labels = percent_format())
 
-plotIt(p)
+ggplot(data=sqlMonResults_DF,aes(x=reorder(name,offloadEfficiency),y=offloadEfficiency))+
+  geom_point()+
+  geom_text(aes(label=(paste0((offloadEfficiency*100),"%")),vjust=1.2),size=3)+
+  xlab("Query")+
+  ylab("Offload Efficiency")+
+  labs(title="Queries by Offload Efficiency")+
+  scale_y_continuous(labels = percent_format())
 
-p <- ggplot(data=sqlMonResults_DF,aes(x=reorder(name,readGB),y=readGB))+
+ggplot(data=sqlMonResults_DF,aes(x=reorder(name,readGB),y=readGB))+
   geom_point()+
   geom_text(aes(label=readGB,vjust=1.2),size=3)+
   xlab("Query")+
   ylab("GB")+
   labs(title="Queries by Physical I/O")
-
-plotIt(p)
-
-
   
 #sqlMonResults_DF.melt <- melt(sqlMonResults_DF, id.var = c("name"), measure.var = c("dbTimePctCPU", "dbTimePctIO","dbTimePctOther", "dbTimePctCluster","dbTimePctApp","dbTimePctQueuing"))
 sqlMonResults_DF.melt <- melt(sqlMonResults_DF, id.var = c("name"), measure.var = c("dbTimePctCPU", "dbTimePctIO","dbTimePctOther", "dbTimePctCluster","dbTimePctApp","dbTimePctQueuing"))
@@ -379,14 +251,11 @@ aas_colors <- c("Administrative" = "#6c6e69", "Application" = "#bf2a05", "Cluste
                 "I/O" = "#054ae1")
 gg_aas_colors <- scale_fill_manual("", values = aas_colors)
 
-
-
-
-
-p <- ggplot(data=sqlMonResults_DF.melt)+
-  geom_bar(aes(x=name,y=value,fill=variable),stat='identity',position='stack')+
+ggplot(data=sqlMonResults_DF.melt)+
+  geom_bar(width=1.8,aes(x=name,y=value,fill=variable),stat='identity',position='stack')+
   geom_text(aes(label=(value*100),x=name,y=value,vjust=1),size=2.5,stat='identity',position='stack')+
   scale_y_continuous(labels = percent_format())+
+  scale_x_discrete()+
   gg_aas_colors+
   xlab("Query")+
   ylab("% Wait")+
@@ -394,35 +263,37 @@ p <- ggplot(data=sqlMonResults_DF.melt)+
   theme(axis.text.x=element_text(angle=-90, hjust=0,vjust=0,size=8))
 
 
-plotIt(p)
+ggplot(data=sqlMonResults_DF.melt)+
+  geom_bar(aes(x=name,y=value,fill=variable),stat='identity',position='stack')+
+  geom_text(aes(label=(value*100),x=name,y=value,vjust=1),size=2.5,stat='identity',position='stack')+
+  scale_y_continuous(labels = percent_format())+
+  gg_aas_colors+
+  xlab("Query")+
+  ylab("% Wait")+
+  labs(title="Wait % by Query by Category")
 
 
+ggplot(data=sqlMonResults_DF.melt)+
+  geom_bar(aes(x=parallel_degree,y=value,fill=variable),stat='identity',position='stack')+
+  geom_text(aes(label=(value*100),x=parallel_degree,y=value,vjust=1),size=2.5,stat='identity',position='stack')+
+  scale_y_continuous(labels = percent_format())+
+  gg_aas_colors+
+  xlab("Query")+
+  ylab("% Wait")+
+  labs(title="Wait % by Query by Category")
 
-sqlMonResults_DF.melt2 <- melt(sqlMonResults_DF, id.var = c("name"), measure.var = c("duration", "sqlplus.elap"))
-#x.melt$variable<-gsub( "os_cpu_max" , "OS CPU Max" , x.melt$variable)
-
-sqlMonResults_DF.melt2$variable <- gsub( "duration" , "sqlmon.elap" , sqlMonResults_DF.melt2$variable)
-
-ggplot(data=sqlMonResults_DF.melt2,aes(x=name,y=value,group=variable))+
-  geom_bar(position="dodge",stat="identity",aes(fill=variable))+
-  geom_text(aes(label=value),size=2.5,stat='identity',position='dodge')+
-  xlab("Query Name")+
-  ylab("Seconds")+
-  labs(title="SQL Monitor Timing vs SQL*Plus Timing (optimizer_adaptive_features=false)")
-
-
+ggplot(data=sqlMonResults_DF.melt)+
+  geom_bar(aes(x=parallel_degree,y=value,fill=variable),stat='identity',position='stack')+
+  facet_grid(variable ~ .)+
+  geom_text(aes(label=(value*100),x=parallel_degree,y=value,vjust=-.2),size=2.5,stat='identity',position='stack')+
+  scale_y_continuous(labels = percent_format())+
+  gg_aas_colors+
+  xlab("Query")+
+  ylab("% Wait")+
+  labs(title="Wait % by Query by Category")
 
 dev.off()
 
-SUMMARY_DF_TMP <- sqlMonResults_DF[,1:15]
-SUMMARY_DF_TMP$link.html <- paste0('<a href="',SUMMARY_DF_TMP$file,'">',SUMMARY_DF_TMP$file,'</a>')
-SUMMARY_DF_TMP$link.txt <- paste0('<a href="',file_path_sans_ext(SUMMARY_DF_TMP$file),'.txt">',
-                                  file_path_sans_ext(SUMMARY_DF_TMP$file),'.txt</a>')
-
-#SUMMARY_DF_TMP <- SUMMARY_DF_TMP[order(SUMMARY_DF_TMP$duration,decreasing = TRUE),]
-SUMMARY_DF_TMP <- SUMMARY_DF_TMP[order(SUMMARY_DF_TMP$name,decreasing = FALSE),]
-sjt.df(SUMMARY_DF_TMP,file=paste0("summary.html"),describe=FALSE,alternateRowColors=TRUE)
-rm(SUMMARY_DF_TMP)
 
 
 
@@ -430,11 +301,24 @@ rm(SUMMARY_DF_TMP)
 
 
 
-
-  
-
+############################################################
 
 
-##################
+fileName <- "sqlmon_b_px_16.html"
+doc <- xmlParse(fileName, getDTD = F)
+
+activity_detail <- getNodeSet(doc,"//activity_detail")
+detailAttributes <- data.frame(detailAttributes)
+str(activity_detail)
+
+
+
+
+detailAttributes <- xmlAttrs(doc[["//activity_detail"]])
+detailAttributes <- data.frame(name=names(detailAttributes),value=detailAttributes,row.names=NULL)
+activity_detail <- getNodeSet(doc,"//activity_detail/bucket")
+
+foo <- data.frame(key=sapply(activity_detail, xmlGetAttr, "bucket"))
+
 
 

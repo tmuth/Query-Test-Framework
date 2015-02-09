@@ -21,7 +21,6 @@
 ----------------------------------------------------------------------------------------- 
 
 whenever sqlerror exit 2;
-set termout on
 set SERVEROUTPUT off
 set timing off
 set wrap off
@@ -32,8 +31,8 @@ set pagesize 10000
 set linesize 300
 column name format a70
 set numwidth 16
---alter session force parallel query parallel ^5;
---alter session set parallel_degree_policy=MANUAL;
+alter session force parallel query parallel ^5;
+alter session set parallel_degree_policy=MANUAL;
 alter session set statistics_level=ALL;
 
 @^3
@@ -49,7 +48,7 @@ set wrap off
 
 set timing off
 
-set termout off
+
 column prev_sql_id new_value PREV_SQLID
 select prev_sql_id from v$session where audsid=userenv('sessionid');
 

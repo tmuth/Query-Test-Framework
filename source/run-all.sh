@@ -1,11 +1,11 @@
 #!/bin/bash
-DIRECTORY=queries
+DIRECTORY=retail-queries2
 #OUTPUT_SUB_DIRECTORY="Test1"
-OUTPUT_SUB_DIRECTORY=`echo "test_"$(date +"%m-%d_%H-%M-%S")`
-FILES=*.sql
-ALTER_SESSION_FILE=null.sql
-CONNECT_STRING=scott/tiger
-. ~/./orcl.env
+OUTPUT_SUB_DIRECTORY=`echo "d7.test_"$(date +"%m-%d_%H-%M-%S")`
+FILES=rtl*.sql
+ALTER_SESSION_FILE=no-in-memory.sql
+CONNECT_STRING=d7/d7
+# . ~/./orcl.env
 
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -47,6 +47,14 @@ do
 			echo "Query Name: $queryname"
 			
 			\sqlplus $CONNECT_STRING @"$QUERY_CAPTURE_FILE" $f $queryname "$ALTER_SESSION_FILE" $OUTPUT_SUB_DIRECTORY
+			errorCode=$?
+                        echo "Error Code: $errorCode"
+
+                        if [ "$errorCode" -gt 0 ]
+                        then
+                           break  # Skip entire rest of loop.
+                        fi
+
 		fi
 	fi
 done
