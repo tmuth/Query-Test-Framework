@@ -51,7 +51,8 @@ set timing off
 
 set termout off
 column prev_sql_id new_value PREV_SQLID
-select prev_sql_id from v$session where audsid=userenv('sessionid');
+column prev_child_number new_value PREV_CHILD_CURSOR
+select prev_sql_id,prev_child_number from v$session where audsid=userenv('sessionid');
 
 select s.name, m.value
   from v$mystat m, v$statname s
@@ -62,7 +63,7 @@ select s.name, m.value
 
 
 
-select * from table(dbms_xplan.display_cursor(sql_id => '^PREV_SQLID', format=>'ALLSTATS LAST'));
+select * from table(dbms_xplan.display_cursor(sql_id => '^PREV_SQLID', cursor_child_no => ^PREV_CHILD_CURSOR,format=>'ALLSTATS LAST'));
 
 --select * from table(dbms_xplan.display_cursor(sql_id => '^PREV_SQLID', format=>'advanced +parallel +partition +predicate'));
 
